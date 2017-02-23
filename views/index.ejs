@@ -1,0 +1,127 @@
+<html>
+<head>
+<title>Tyler's chat world</title>
+<% include partials/head.ejs %>
+<style>
+body {
+    background-color: powderblue;
+}
+#chatwrap {
+    border-radius: 10px;
+    background-color: powderblue;
+    background: url(/images/wood.jpg);
+    min-height: 400;
+    max-height: 400;
+    overflow-y: scroll;
+}
+#inputArea {
+    background-color: powderblue;
+    border: double 4px orange;
+    border-radius: 0.5em;
+}
+.error {
+    color: red;
+}
+</style>
+</head>
+<body>
+    <!- User provides their nickname here ->
+    <section class="container" align="center" id="nicknameSection">
+        <img class="img-circle" width="500" height="500" src="/images/minion.jpg">
+        <h3>Provide your nickname</h3>
+        <p id="nicknameError" />
+        <!- Designate the form as a region using role="form" for quick region navigation. ->
+        <form id="nicknameForm" role="form" name="nicknameForm">
+             <input type="text" name="nickname" autofocus required placeholder="your nickname" id="nickname" />
+             <input type="submit" class="btn btn-danger" value="submit" />
+    </section>
+    <section class="container" id="chatSection" style="display: none">
+        <!- chat stream ->
+        <section class="panel panel-primary">
+            <div class="panel-body">
+                <div class="col-md-6 col-md-offset-1 panel panel-secondary">
+                    <div class="panel-body" id="chatwrap">
+                        <div id="chatbody">
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 col-md-offset-1 panel panel-secondary">
+                    <div class="panel-heading">currently online</div>
+                    <div class="panel-body" id="users">
+                    </div>
+                </div>
+            </div>
+        </section>
+        <!- chat input ->
+        <section class="panel panel-primary">
+            <div class="panel-body">
+                <div class="col-md-6 col-md-offset-1">
+                    <textarea autofocus name="message" rows="3" cols="60" id="message" placeholder="Write your message and press enter.."></textarea>
+                </div>
+            </div>
+        </section>
+        <section class="panel panel-primary">
+            <div class="panel-body">
+                <div class="col-md-6 col-md-offset-1 panel panel-secondary">
+                    <h1>
+                        <code>@tyler hello!</code> to say hello to tyler privately
+                    </h1>
+                </div>
+            </div>
+        </section>
+    </section>
+    <script src="https://code.jquery.com/jquery-2.2.0.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/bootstrap.js"></script>
+    <!- Event handlers ->
+    <script>
+        $(document).ready(function() {
+            var socket = io.connect();
+            $("#nicknameForm").submit(function(event) {
+                event.preventDefault();
+                nickname = $("#nickname").val();
+                $("#nickname").val("");
+                socket.emit("new-user", nickname, function(data) {
+                    if (!data) {
+                        $("#nicknameError").html("Sorry, that nickname is already taken. Try another one.");
+                        return;
+                    }
+                    $("#nicknameSection").hide();
+                    document.title = nickname;
+                    $("#chatSection").show();
+                });
+            });
+            socket.on("usernames", function(usernames) {
+                html = "";
+                for (i=0; i<usernames.length; i++) {
+                    html += "<li><span>" + usernames[i] + "</span></li>";
+                }
+                $("#users").html("<ul>" + html + "</ul>");
+            });
+            $("#message").keydown(function(event) {
+                if (event.keyCode != 13) { return; }
+                event.preventDefault();
+                socket.emit("send-message", $("#message").val(), function(data) {
+                    $("#chatbody").append("<p align='right' class='error' >" + data + "&nbsp;&nbsp;</p><br/>");
+                });
+                $("#message").val("");
+                return false;
+            });
+            socket.on("new-message", function(data) {
+                alignment = (data.nick == document.title) ? "right" : "left";
+                html = "<p style='' align='" + alignment + "' class='msg'>";
+                if (data.private) {
+                    html += "<i><b>" + data.nick;
+                    if (data.at) {
+                        html += "@" + data.at;
+                    }
+                    html += ": </b>" + data.msg + "</i>&nbsp;&nbsp;</p>"
+                } else {
+                    html += "<b>" + data.nick + ": </b>" + data.msg + "&nbsp;&nbsp;</p>"
+                }
+                $("#chatbody").append(html);
+                $("#chatwrap").scrollTop($("#chatbody").outerHeight());
+            });
+        });
+    </script>
+</body>
